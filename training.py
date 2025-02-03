@@ -49,3 +49,4 @@ for b in range(batch_size):
         context=xb[b,:a+1]
         target=yb[b,a]
         print(f"context: {context}, target: {target}")
+    
