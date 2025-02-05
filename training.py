@@ -11,7 +11,7 @@ eval_interval = 500
 learning_rate = 3e-4
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 eval_iters = 200
-n_embd=246
+n_embd=244
 n_layer=6
 n_head=6
 dropout=0.2
@@ -62,7 +62,7 @@ voc_size=len(voc)
 class Head(nn.Module):
     """ One head of self-attention """
 
-    def __init__(self, head_size,n_embd=246, block_size=124):
+    def __init__(self, head_size,n_embd=244, block_size=124):
         super().__init__()
         self.key = nn.Linear(n_embd, head_size, bias=False)
         self.query = nn.Linear(n_embd, head_size, bias=False)
