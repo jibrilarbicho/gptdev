@@ -4,15 +4,17 @@ from torch.nn import functional as F
 with open("./input.txt", "r",encoding="utf-8") as file:
     data = file.read()
     # print(data)
-batch_size = 32      
-block_size = 8
-max_iters = 3000
-eval_interval = 300
-learning_rate = 1e-2
+batch_size = 64    
+block_size = 124
+max_iters = 500
+eval_interval = 500
+learning_rate = 3e-4
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 eval_iters = 200
-n_embd=32
-
+n_embd=246
+n_layer=6
+n_head=6
+dropout=0.2
 
 voc=sorted(list(set(data)))
 # print(len(data))
@@ -60,12 +62,13 @@ voc_size=len(voc)
 class Head(nn.Module):
     """ One head of self-attention """
 
-    def __init__(self, head_size,n_embd=32, block_size=8):
+    def __init__(self, head_size,n_embd=246, block_size=124):
         super().__init__()
         self.key = nn.Linear(n_embd, head_size, bias=False)
         self.query = nn.Linear(n_embd, head_size, bias=False)
         self.value = nn.Linear(n_embd, head_size, bias=False)
         self.register_buffer('tril', torch.tril(torch.ones(block_size, block_size)))
+        self.dropout=nn.Dropout(dropout)
 
     def forward(self, x):
         B, T, C = x.shape  
@@ -78,7 +81,8 @@ class Head(nn.Module):
         # Apply the triangular mask
         wei = wei.masked_fill(self.tril[:T, :T] == 0, float('-inf'))  
         
-        wei = F.softmax(wei, dim=-1)  
+        wei = F.softmax(wei, dim=-1)
+        wei=self.dropout(wei)  
 
         v = self.value(x)  
         out = wei @ v 
@@ -91,11 +95,12 @@ class MultiHeadAttention(nn.Module):
         super().__init__()
         self.heads = nn.ModuleList([Head(head_size) for _ in range(num_heads)])
         self.projection=nn.Linear(n_embd,n_embd)
+        self.dropout=nn.Dropout(dropout)
 
     
     def forward(self, x):
         # out=torch.cat([h(x) for h in self.heads], dim=-1)
-        return self.projection(torch.cat([h(x) for h in self.heads], dim=-1))
+        return self.dropout(self.projection(torch.cat([h(x) for h in self.heads], dim=-1)))
 class FeedForward(nn.Module):
     """A simple linear layer followed by a non-linearity."""
     
@@ -104,7 +109,8 @@ class FeedForward(nn.Module):
         self.net = nn.Sequential(
             nn.Linear(n_embd, n_embd),
             nn.ReLU(),
-            nn.Linear(n_embd, n_embd)
+            nn.Linear(n_embd, n_embd),
+            nn.Dropout(dropout)  
         )
     
     def forward(self, x):
@@ -135,12 +141,11 @@ class BigramLanguageModel(nn.Module):
         # self.head=Head(n_embd)
         # self.head=MultiHeadAttention(4,n_embd//4)
         # self.ff=FeedForward(n_embd)
-        self.block=nn.Sequential(
-            Block(n_embd,4),
-            Block(n_embd,4),
-            Block(n_embd,4),
-            Block(n_embd,4),
+        self.block=nn.Sequential(*[
+            Block(n_embd,n_head=4) for _ in range(n_layer)
+           ]
         )
+        self.lnf=nn.LayerNorm(n_embd)
     
     def forward(self, xb,yb=None):
         B,T=xb.shape
