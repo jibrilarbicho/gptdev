@@ -56,10 +56,11 @@ voc_size=len(voc)
 #         context=xb[b,:a+1]
 #         target=yb[b,a]
 #         print(f"context: {context}, target: {target}")
+
 class Head(nn.Module):
     """ One head of self-attention """
 
-    def __init__(self, head_size,n_embd, block_size):
+    def __init__(self, head_size,n_embd=32, block_size=8):
         super().__init__()
         self.key = nn.Linear(n_embd, head_size, bias=False)
         self.query = nn.Linear(n_embd, head_size, bias=False)
@@ -83,13 +84,24 @@ class Head(nn.Module):
         out = wei @ v 
 
         return out    
+class MultiHeadAttention(nn.Module):
+    """Multiple heads of self-attention in parallel"""
+    
+    def __init__(self, num_heads, head_size):
+        super().__init__()
+        self.heads = nn.ModuleList([Head(head_size) for _ in range(num_heads)])
+    
+    def forward(self, x):
+        return torch.cat([h(x) for h in self.heads], dim=-1)
+
 class BigramLanguageModel(nn.Module):
     def __init__(self):
         super().__init__()
         self.token_embedding_table=nn.Embedding(voc_size,n_embd)
-        positional_emb=nn.Embedding(block_size,n_embd)
+        self.positional_emb=nn.Embedding(block_size,n_embd)
         self.lm_head=nn.Linear(n_embd,voc_size)
-        self.head=Head(n_embd)
+        # self.head=Head(n_embd)
+        self.head=MultiHeadAttention(4,n_embd//4)
     
     def forward(self, xb,yb=None):
         B,T=xb.shape
